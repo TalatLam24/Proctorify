@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proctorify | Exam</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/styles.css">
+<style>
+    :root {
+        --mono: 'JetBrains Mono', monospace;
+        --sans: 'Inter', -apple-system, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+
+    body {
+        background:
+            radial-gradient(1200px 600px at 15% -10%, rgba(91,140,255,0.06), transparent 60%),
+            var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+    }
+
+    .frame {
+        width: 100%;
+        max-width: 1180px;
+        height: calc(100vh - 32px);
+        max-height: 820px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--panel);
+        overflow: hidden;
+        box-shadow: 0 30px 80px -30px rgba(0,0,0,0.6);
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Title bar */
+    .titlebar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 22px;
+        border-bottom: 1px solid var(--line);
+        background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+    }
+
+    .session-meta {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--muted);
+    }
+
+    .rec-pill {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: rgba(229,72,77,0.1);
+        border: 1px solid rgba(229,72,77,0.35);
+        color: #ff8a8d;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+
+    .rec-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--rec);
+        animation: pulse 1.6s infinite;
+    }
+
+    @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(229,72,77,0.55); }
+        70% { box-shadow: 0 0 0 8px rgba(229,72,77,0); }
+        100% { box-shadow: 0 0 0 0 rgba(229,72,77,0); }
+    }
+
+    #clock { color: var(--text); }
+
+    /* Body grid */
+    .body-grid {
+        display: grid;
+        grid-template-columns: 1.35fr 1fr;
+        gap: 1px;
+        background: var(--line);
+        flex: 1;
+        min-height: 0;
+    }
+
+    @media (max-width: 820px) {
+        .body-grid { grid-template-columns: 1fr; }
+    }
+
+    .col {
+        background: var(--panel);
+        display: flex;
+        flex-direction: column;
+        padding: 16px;
+        gap: 10px;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    .panel-label {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        color: var(--muted-2);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: 0 0 auto;
+    }
+
+    .panel-label::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--line);
+    }
+
+    /* Webcam */
+    .webcam-box {
+        position: relative;
+        flex: 1;
+        min-height: 250px;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #0c0e10;
+        border: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .webcam-box video {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        transform: scaleX(-1);
+    }
+
+    .webcam-placeholder {
+        text-align: center;
+        color: var(--muted-2);
+        font-family: var(--mono);
+        font-size: 12px;
+        padding: 20px;
+        line-height: 1.6;
+    }
+
+    .webcam-placeholder svg {
+        opacity: 0.5;
+        margin-bottom: 10px;
+    }
+
+    .webcam-tag {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.5px;
+        color: #fff;
+        background: rgba(0,0,0,0.45);
+        padding: 4px 8px;
+        border-radius: 5px;
+        backdrop-filter: blur(4px);
+    }
+
+    .webcam-tag .rec-dot {
+        width: 6px;
+        height: 6px;
+        animation: none;
+        box-shadow: none;
+    }
+
+    .webcam-corner-ts {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        font-family: var(--mono);
+        font-size: 10px;
+        color: rgba(255,255,255,0.75);
+        background: rgba(0,0,0,0.45);
+        padding: 4px 8px;
+        border-radius: 5px;
+    }
+
+    /* Probability bar */
+    .prob-bar-container {
+        margin-top: 8px;
+    }
+
+    .prob-bar-label {
+        display: flex;
+        justify-content: space-between;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--muted-2);
+        margin-bottom: 6px;
+    }
+
+    .prob-bar-track {
+        height: 8px;
+        background: var(--panel-2);
+        border-radius: 4px;
+        overflow: hidden;
+        position: relative;
+        border: 1px solid var(--line);
+    }
+
+    .prob-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--ok) 0%, var(--warn) 50%, var(--rec) 100%);
+        transition: width 0.15s ease;
+        width: 0%;
+    }
+
+    .prob-bar-threshold {
+        position: absolute;
+        top: -2px;
+        bottom: -2px;
+        width: 2px;
+        background: var(--accent);
+        left: 6%;
+        opacity: 0.7;
+    }
+
+    /* Status */
+    .status-box {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel-2);
+        padding: 14px 16px;
+        font-family: var(--mono);
+        font-size: 12.5px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .status-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: var(--muted);
+    }
+
+    .status-row b {
+        color: var(--text);
+        font-weight: 500;
+    }
+
+    .label-line {
+        font-family: var(--mono);
+        font-weight: 700;
+        font-size: 17px;
+        letter-spacing: 0.5px;
+        color: #39ff6a;
+        text-shadow: 0 0 10px rgba(57,255,106,0.35);
+        padding-top: 2px;
+        transition: color 0.2s ease, text-shadow 0.2s ease;
+    }
+
+    .label-line.state-cheat_physical {
+        color: #ff9d3d;
+        text-shadow: 0 0 10px rgba(255,157,61,0.4);
+    }
+
+    .label-line.state-cheat_digital {
+        color: #ff4d4f;
+        text-shadow: 0 0 10px rgba(255,77,79,0.4);
+    }
+
+    /* Question / Answer */
+    .qa-panel {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel-2);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+    }
+
+    .q-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 18px;
+        border-bottom: 1px dashed var(--line);
+    }
+
+    .q-index {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--accent);
+        letter-spacing: 1px;
+        font-weight: 600;
+    }
+
+    .q-body {
+        padding: 14px 18px;
+        font-size: 14.5px;
+        line-height: 1.55;
+        color: var(--text);
+        border-bottom: 1px solid var(--line);
+        max-height: 110px;
+        overflow-y: auto;
+    }
+
+    .a-label {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 1px;
+        color: var(--muted-2);
+        padding: 10px 18px 0;
+    }
+
+    textarea {
+        flex: 1;
+        min-height: 100px;
+        resize: none;
+        margin: 8px 18px 14px;
+        background: var(--input-bg);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: var(--sans);
+        font-size: 14.5px;
+        line-height: 1.6;
+        padding: 14px;
+        outline: none;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    textarea::placeholder { color: var(--muted-2); }
+    textarea:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(91,140,255,0.15);
+    }
+
+    .q-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 18px;
+        border-top: 1px solid var(--line);
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .q-footer-btns {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: auto;
+    }
+
+    .char-count {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--muted-2);
+    }
+
+    /* Alert log */
+    .alert-log {
+        max-height: 100px;
+        overflow-y: auto;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--muted);
+        padding: 6px 0;
+    }
+
+    .alert-log-item {
+        padding: 4px 0;
+        border-bottom: 1px dashed var(--line);
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .alert-log-item .alert-time {
+        color: var(--rec);
+        font-weight: 600;
+    }
+
+    .alert-log-item .alert-detail {
+        color: var(--muted);
+    }
+
+    /* Connection status */
+    .conn-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-family: var(--mono);
+        font-size: 11px;
+    }
+
+    .conn-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+
+    .conn-dot.connected { background: var(--ok); box-shadow: 0 0 6px rgba(61,220,151,0.5); }
+    .conn-dot.disconnected { background: var(--muted-2); }
+    .conn-dot.connecting { background: var(--warn); animation: pulse 1.6s infinite; }
+
+    @media (prefers-reduced-motion: reduce) {
+        .rec-dot { animation: none; }
+    }
+</style>
+</head>
+<body>
+
+<div class="frame">
+    <div class="titlebar">
+        <div class="brand">
+            <div class="brand-mark"></div>
+            <div class="brand-name">Proctor<span>ify</span></div>
+        </div>
+        <div class="session-meta">
+            <div class="rec-pill"><span class="rec-dot"></span>MONITORING</div>
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" title="Toggle theme">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            </button>
+            <div id="clock">00:00:00</div>
+        </div>
+    </div>
+
+    <div class="body-grid">
+        <!-- LEFT: Webcam + Status -->
+        <div class="col">
+            <div class="panel-label">Webcam</div>
+            <div class="webcam-box">
+                <div class="webcam-placeholder" id="camPlaceholder">
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+                        <path d="M23 7l-7 5 7 5V7z"></path>
+                        <rect x="1" y="5" width="15" height="14" rx="2"></rect>
+                    </svg>
+                    <div>Initializing camera...</div>
+                </div>
+                <video id="camFeed" autoplay muted playsinline style="display:none;"></video>
+                <div class="webcam-tag"><span class="rec-dot"></span>LIVE</div>
+                <div class="webcam-corner-ts" id="camTs">--:--:--</div>
+            </div>
+
+            <div class="panel-label">Status</div>
+            <div class="status-box">
+                <div class="label-line" id="labelLine">LABEL: NORMAL</div>
+
+                <div class="prob-bar-container">
+                    <div class="prob-bar-label">
+                        <span>Suspicion Probability</span>
+                        <span id="probValue">0.000</span>
+                    </div>
+                    <div class="prob-bar-track">
+                        <div class="prob-bar-fill" id="probBarFill"></div>
+                        <div class="prob-bar-threshold" id="probBarThreshold" title="Threshold: 0.06"></div>
+                    </div>
+                </div>
+
+                <div class="status-row">
+                    <span>Flags this session</span>
+                    <b id="flagCount">0</b>
+                </div>
+                <div class="status-row">
+                    <span>Frames processed</span>
+                    <b id="frameCount">0</b>
+                </div>
+                <div class="status-row">
+                    <span>Face detected</span>
+                    <b id="faceDetected">—</b>
+                </div>
+                <div class="status-row">
+                    <span>Server connection</span>
+                    <div class="conn-status">
+                        <div class="conn-dot connecting" id="connDot"></div>
+                        <span id="connStatus">Connecting...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-label">Alert Log</div>
+            <div class="alert-log" id="alertLog">
+                <div style="color: var(--muted-2); font-size: 11px;">No alerts yet.</div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Q&A -->
+        <div class="col">
+            <div class="panel-label">Exam: <span id="examTitle" style="color: var(--text); font-weight: 600; margin-left: 8px;">Loading...</span></div>
+            <div class="qa-panel">
+                <div class="q-head">
+                    <div class="q-index" id="qIndex">QUESTION 1</div>
+                </div>
+
+                <div class="q-body" id="questionText">Loading question...</div>
+                <div class="a-label">Your answer</div>
+                <textarea id="answerBox" placeholder="Type your answer here..." disabled></textarea>
+                <div class="q-footer">
+                    <span class="char-count" id="charCount">0 characters</span>
+                    <div class="q-footer-btns">
+                        <button class="btn-secondary" id="prevBtn" disabled>&larr; Prev</button>
+                        <button class="btn-secondary" id="nextBtn" disabled>Next &rarr;</button>
+                        <button class="btn-primary" id="submitBtn" disabled>Submit exam</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/auth.js"></script>
+<script>
+    initTheme();
+    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+    // Require authentication
+    requireAuth().then(user => {
+        if (!user) return;
+        initExam();
+    });
+
+    // --- State ---
+    let sessionId = null;
+    let exam = null;
+    let questions = [];
+    let answers = [];
+    let currentQ = 0;
+    let ws = null;
+    let wsConnected = false;
+    let videoStream = null;
+    let frameInterval = null;
+    let frameCount = 0;
+    let flagCount = 0;
+    let alertCount = 0;
+    let examEnded = false;
+
+    // --- UI Override State ---
+    let uiOverrideTimer = null;
+    let uiOverrideLabel = null;
+
+    function setUiOverride(label, durationMs) {
+        uiOverrideLabel = label;
+        clearTimeout(uiOverrideTimer);
+        uiOverrideTimer = setTimeout(() => {
+            uiOverrideLabel = null;
+        }, durationMs);
+    }
+
+    // --- DOM Elements ---
+    const camPlaceholder = document.getElementById('camPlaceholder');
+    const camFeed = document.getElementById('camFeed');
+    const camTs = document.getElementById('camTs');
+    const labelLine = document.getElementById('labelLine');
+    const probBarFill = document.getElementById('probBarFill');
+    const probValue = document.getElementById('probValue');
+    const flagCountEl = document.getElementById('flagCount');
+    const frameCountEl = document.getElementById('frameCount');
+    const faceDetectedEl = document.getElementById('faceDetected');
+    const connDot = document.getElementById('connDot');
+    const connStatus = document.getElementById('connStatus');
+    const alertLog = document.getElementById('alertLog');
+    const examTitle = document.getElementById('examTitle');
+    const qIndex = document.getElementById('qIndex');
+    const questionText = document.getElementById('questionText');
+    const answerBox = document.getElementById('answerBox');
+    const charCount = document.getElementById('charCount');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    const clockEl = document.getElementById('clock');
+
+    // --- Clock ---
+    function tick() {
+        const now = new Date();
+        const s = now.toTimeString().slice(0, 8);
+        clockEl.textContent = s;
+        camTs.textContent = s;
+    }
+    tick();
+    setInterval(tick, 1000);
+
+    // --- Initialize exam ---
+    async function initExam() {
+        sessionId = sessionStorage.getItem('current_session_id');
+        const examData = sessionStorage.getItem('current_exam');
+
+        if (!sessionId || !examData) {
+            alert('No active session. Redirecting to lobby.');
+            window.location.href = '/lobby';
+            return;
+        }
+
+        exam = JSON.parse(examData);
+        questions = exam.questions || [];
+        answers = new Array(questions.length).fill('');
+
+        examTitle.textContent = exam.title;
+        renderQuestion();
+
+        // Enable controls
+        answerBox.disabled = false;
+        prevBtn.disabled = false;
+        nextBtn.disabled = false;
+        submitBtn.disabled = false;
+
+        // Setup keyboard/mouse event capture
+        setupEventCapture();
+
+        // Start webcam and WebSocket
+        await startWebcam();
+        connectWebSocket();
+    }
+
+    // --- Question rendering ---
+    function renderQuestion() {
+        qIndex.textContent = `QUESTION ${currentQ + 1} OF ${questions.length}`;
+        questionText.textContent = questions[currentQ] || '';
+        answerBox.value = answers[currentQ] || '';
+        charCount.textContent = `${answerBox.value.length} characters`;
+        prevBtn.disabled = currentQ === 0;
+        nextBtn.disabled = currentQ === questions.length - 1;
+    }
+
+    prevBtn.addEventListener('click', () => {
+        if (currentQ > 0) {
+            answers[currentQ] = answerBox.value;
+            currentQ--;
+            renderQuestion();
+        }
+    });
+
+    nextBtn.addEventListener('click', () => {
+        if (currentQ < questions.length - 1) {
+            answers[currentQ] = answerBox.value;
+            currentQ++;
+            renderQuestion();
+        }
+    });
+
+    answerBox.addEventListener('input', () => {
+        answers[currentQ] = answerBox.value;
+        charCount.textContent = `${answerBox.value.length} characters`;
+    });
+
+    // --- Submit ---
+    submitBtn.addEventListener('click', async () => {
+        if (examEnded) return;
+        if (!confirm('Are you sure you want to submit your exam? This cannot be undone.')) return;
+
+        answers[currentQ] = answerBox.value;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+
+        try {
+            // Send "end" message to WebSocket
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'end' }));
+            }
+
+            // Submit answers via HTTP
+            const answersObj = {};
+            answers.forEach((ans, i) => { answersObj[i] = ans; });
+
+            const data = await apiCall(`/api/session/${sessionId}/submit`, {
+                method: 'POST',
+                body: JSON.stringify({ answers: answersObj })
+            });
+
+            examEnded = true;
+            sessionStorage.setItem('result_session_id', sessionId);
+            setTimeout(() => {
+                window.location.href = '/result';
+            }, 500);
+        } catch (err) {
+            alert('Failed to submit exam: ' + err.message);
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit exam';
+        }
+    });
+
+    // --- Keyboard/mouse event capture ---
+    function setupEventCapture() {
+        document.addEventListener('keydown', (e) => {
+            if (examEnded) return;
+            // Capture all keypresses — model uses keyboard features for prediction
+            const key = e.key.length === 1 ? e.key : `Key.${e.key}`;
+            const timestamp = Date.now() / 1000;
+            sendEvent({ type: 'keyboard_event', key, timestamp });
+        });
+
+        document.addEventListener('mousedown', (e) => {
+            if (examEnded) return;
+            const button = e.button === 0 ? 'left' : e.button === 1 ? 'middle' : 'right';
+            const timestamp = Date.now() / 1000;
+            sendEvent({ type: 'mouse_event', button, timestamp });
+        });
+
+        // --- CHEAT_DIGITAL detection: window/tab switch ---
+        // Fires when user switches to another tab or minimizes the browser
+        document.addEventListener('visibilitychange', () => {
+            if (examEnded) return;
+            if (document.hidden) {
+                const timestamp = Date.now() / 1000;
+                sendEvent({ type: 'digital_cheat_event', timestamp, reason: 'tab_switch' });
+                // Update UI immediately
+                setDigitalCheatLabel('Tab switch detected');
+            }
+        });
+
+        // Fires when window loses focus (Alt+Tab, clicked another app, etc.)
+        window.addEventListener('blur', () => {
+            if (examEnded) return;
+            const timestamp = Date.now() / 1000;
+            sendEvent({ type: 'digital_cheat_event', timestamp, reason: 'window_blur' });
+            setDigitalCheatLabel('Window focus lost');
+        });
+    }
+
+    // --- Helper to display digital cheating in the UI ---
+    function setDigitalCheatLabel(reason) {
+        setUiOverride('CHEAT_DIGITAL', 5000); // Lock UI for 5 seconds
+        flagCount++;
+        flagCountEl.textContent = flagCount;
+        addAlertLog(`DIGITAL CHEAT: ${reason}`, 'digital');
+    }
+
+    function sendEvent(event) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(event));
+        }
+    }
+
+    // --- Webcam ---
+    async function startWebcam() {
+        try {
+            camPlaceholder.innerHTML = '<div>Requesting camera access...</div>';
+            videoStream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 640, height: 480 }
+            });
+            camFeed.srcObject = videoStream;
+            camFeed.style.display = 'block';
+            camPlaceholder.style.display = 'none';
+        } catch (err) {
+            camPlaceholder.innerHTML = '<div>Camera access denied.<br>Enable it in your browser settings.</div>';
+            console.error('Camera error:', err);
+        }
+    }
+
+    // --- WebSocket connection ---
+    function connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/proctor/${sessionId}`;
+        console.log('Connecting to WebSocket:', wsUrl);
+
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+            wsConnected = true;
+            connDot.className = 'conn-dot connected';
+            connStatus.textContent = 'Connected';
+            ws.send(JSON.stringify({ type: 'start', session_id: sessionId }));
+            // Start sending frames
+            startFrameStreaming();
+        };
+
+        ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            handleMessage(msg);
+        };
+
+        ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            connDot.className = 'conn-dot disconnected';
+            connStatus.textContent = 'Error';
+        };
+
+        ws.onclose = () => {
+            wsConnected = false;
+            connDot.className = 'conn-dot disconnected';
+            connStatus.textContent = 'Disconnected';
+            stopFrameStreaming();
+        };
+    }
+
+    // --- Frame streaming at 15 fps ---
+    function startFrameStreaming() {
+        if (frameInterval) clearInterval(frameInterval);
+        const fps = 15;
+        const interval = 1000 / fps;
+
+        frameInterval = setInterval(() => {
+            if (!wsConnected || examEnded) return;
+            if (camFeed.readyState < 2) return; // Not enough data yet
+
+            // Capture frame to canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = 640;
+            canvas.height = 480;
+            const ctx = canvas.getContext('2d');
+
+            // Mirror the video (since we mirrored it with CSS)
+            ctx.save();
+            ctx.scale(-1, 1);
+            ctx.drawImage(camFeed, -canvas.width, 0, canvas.width, canvas.height);
+            ctx.restore();
+
+            // Convert to JPEG
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            const timestamp = Date.now() / 1000;
+
+            // Send to server
+            ws.send(JSON.stringify({
+                type: 'frame',
+                data: dataUrl,
+                timestamp: timestamp
+            }));
+        }, interval);
+    }
+
+    function stopFrameStreaming() {
+        if (frameInterval) {
+            clearInterval(frameInterval);
+            frameInterval = null;
+        }
+    }
+
+    // --- Handle messages from server ---
+    function handleMessage(msg) {
+        if (msg.type === 'prediction') {
+            updatePrediction(msg.probability, msg.label, msg.face_detected, msg.frame_number);
+        } else if (msg.type === 'alert') {
+            handleAlert(msg);
+        } else if (msg.type === 'digital_cheat_confirmed') {
+            addAlertLog(`DIGITAL CHEAT confirmed by server: ${msg.reason}`, 'digital');
+        } else if (msg.type === 'yolo_detection') {
+            if (msg.phone_detected) {
+                setUiOverride('CHEAT_PHYSICAL (PHONE)', 3000); // Lock UI for 3 seconds
+                addAlertLog(`PHONE DETECTED (YOLO conf: ${msg.confidence})`, 'cheat_physical');
+            }
+        } else if (msg.type === 'session_complete') {
+            console.log('Session complete:', msg);
+        } else if (msg.type === 'error') {
+            console.error('Server error:', msg.message);
+        }
+    }
+
+    function updatePrediction(prob, label, faceDetected, frameNum) {
+        // Check for UI Override (YOLO or Digital Cheat)
+        if (uiOverrideLabel) {
+            label = uiOverrideLabel;
+            if (label.includes('CHEAT_PHYSICAL')) {
+                prob = Math.max(prob, 0.95);
+            } else if (label.includes('CHEAT_DIGITAL')) {
+                prob = 1.0;
+            }
+        }
+        
+        // Update label
+        const stateClass = label.includes('CHEAT_PHYSICAL') ? 'state-cheat_physical' :
+                          label.includes('CHEAT_DIGITAL') ? 'state-cheat_digital' : '';
+        labelLine.textContent = `LABEL: ${label}`;
+        labelLine.className = 'label-line' + (stateClass ? ' ' + stateClass : '');
+
+        // Update probability bar
+        probBarFill.style.width = `${Math.min(prob * 100, 100)}%`;
+        probValue.textContent = prob.toFixed(3);
+
+        // Update stats
+        frameCountEl.textContent = frameNum.toLocaleString();
+        faceDetectedEl.textContent = faceDetected ? 'Yes' : 'No';
+    }
+
+    function handleAlert(msg) {
+        if (msg.event === 'started') {
+            flagCount++;
+            flagCountEl.textContent = flagCount;
+            addAlertLog(`ALERT #${msg.alert_number} started`, 'cheat_physical');
+        } else if (msg.event === 'ended') {
+            addAlertLog(`Alert ended (${msg.duration.toFixed(1)}s, peak ${msg.peak_probability.toFixed(2)})`, 'ended');
+        }
+    }
+
+    function addAlertLog(text, type) {
+        const now = new Date().toTimeString().slice(0, 8);
+        const item = document.createElement('div');
+        item.className = 'alert-log-item';
+        item.innerHTML = `<span class="alert-time">${now}</span><span class="alert-detail">${text}</span>`;
+
+        // Remove "No alerts yet" placeholder if it exists
+        const placeholder = alertLog.querySelector('div[style*="muted-2"]');
+        if (placeholder) placeholder.remove();
+
+        alertLog.insertBefore(item, alertLog.firstChild);
+
+        // Keep only last 20 alerts
+        while (alertLog.children.length > 20) {
+            alertLog.removeChild(alertLog.lastChild);
+        }
+    }
+
+    // --- Cleanup on page unload ---
+    window.addEventListener('beforeunload', (e) => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'end' }));
+            ws.close();
+        }
+        stopFrameStreaming();
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+        }
+    });
+</script>
+
+</body>
+</html>

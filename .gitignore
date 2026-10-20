@@ -1,0 +1,45 @@
+# Virtual Environment
+venv/
+venv_/
+env/
+ENV/
+old_/
+
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyc
+.env
+# Ignore large datasets and model files
+*.csv
+*.joblib
+
+# IDE settings
+.vscode/
+.idea/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Logs and databases
+*.log
+*.db
+
+# Task files (if you don't want to upload the large .task files)
+*.task
+*.pkl
+*.json
+
+# Dataset folders (if you don't want to upload raw data)
+Dataset_Raw/
+Dataset_Structured/
+Honeypot_Sessions/
+
+# Large binary files (models)
+*.task
+*.mp4
+*.wav

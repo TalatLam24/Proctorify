@@ -1,0 +1,273 @@
+/* Proctorify Shared Styles
+   Extracted from exam.html's design system.
+   All pages import this for consistent theming. */
+
+/* CSS Variables - Dark theme (default) */
+:root {
+    --bg: #14171a;
+    --panel: #1b1f23;
+    --panel-2: #20252a;
+    --line: #2c3239;
+    --text: #e7e8e6;
+    --muted: #838b93;
+    --muted-2: #5c6570;
+    --rec: #e5484d;
+    --ok: #3ddc97;
+    --warn: #e8b339;
+    --accent: #5b8cff;
+    --danger: #ff4d4f;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Inter', -apple-system, sans-serif;
+    --input-bg: #171a1e;
+}
+
+/* Light theme override */
+html[data-theme="light"] {
+    --bg: #eef0f3;
+    --panel: #ffffff;
+    --panel-2: #f4f5f7;
+    --line: #dde1e6;
+    --text: #1a1d21;
+    --muted: #6b7280;
+    --muted-2: #9aa1a9;
+    --rec: #e5484d;
+    --ok: #16a35e;
+    --warn: #b8860b;
+    --accent: #3d6bea;
+    --danger: #e5484d;
+    --input-bg: #ffffff;
+}
+
+/* Reset */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+
+body {
+    background:
+        radial-gradient(1200px 600px at 15% -10%, rgba(91,140,255,0.06), transparent 60%),
+        var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+}
+
+/* Theme toggle button */
+.theme-toggle {
+    appearance: none;
+    cursor: pointer;
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+    color: var(--muted);
+    width: 28px; height: 28px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .15s ease;
+}
+.theme-toggle:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+.theme-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Brand */
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.brand-mark {
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    background: conic-gradient(from 220deg, var(--accent), #7ea2ff, var(--accent));
+    position: relative;
+    flex-shrink: 0;
+}
+.brand-mark::after {
+    content: "";
+    position: absolute; inset: 6px;
+    border-radius: 3px;
+    background: var(--panel);
+}
+.brand-name {
+    font-weight: 800;
+    font-size: 16px;
+    letter-spacing: 0.2px;
+}
+.brand-name span { color: var(--accent); }
+
+/* Buttons */
+.btn-primary {
+    appearance: none;
+    border: none;
+    cursor: pointer;
+    background: var(--accent);
+    color: #fff;
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 14px;
+    padding: 11px 22px;
+    border-radius: 8px;
+    letter-spacing: 0.2px;
+    transition: transform .12s ease, background .15s ease, box-shadow .15s ease;
+    box-shadow: 0 8px 20px -8px rgba(91,140,255,0.6);
+}
+.btn-primary:hover { background: #4a7bff; transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0px); }
+.btn-primary:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-secondary {
+    appearance: none;
+    cursor: pointer;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--muted);
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    transition: all .15s ease;
+}
+.btn-secondary:hover:not(:disabled) { color: var(--text); border-color: var(--muted-2); }
+.btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Input fields */
+.input-field {
+    width: 100%;
+    height: 48px;
+    padding: 0 16px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--input-bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    outline: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+.input-field:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(91,140,255,0.15);
+}
+.input-field::placeholder { color: var(--muted-2); }
+
+.input-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 6px;
+    letter-spacing: 0.3px;
+}
+
+/* Panel */
+.panel {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+    overflow: hidden;
+}
+
+/* Mono text */
+.mono { font-family: var(--mono); }
+.muted { color: var(--muted); }
+.muted-2 { color: var(--muted-2); }
+
+/* Status colors */
+.text-ok { color: var(--ok); }
+.text-warn { color: var(--warn); }
+.text-danger { color: var(--danger); }
+.text-accent { color: var(--accent); }
+
+/* Error message */
+.error-msg {
+    color: var(--danger);
+    font-size: 13px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(229,72,77,0.08);
+    border: 1px solid rgba(229,72,77,0.25);
+    margin-bottom: 12px;
+}
+
+/* Success message */
+.success-msg {
+    color: var(--ok);
+    font-size: 13px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(61,220,151,0.08);
+    border: 1px solid rgba(61,220,151,0.25);
+    margin-bottom: 12px;
+}
+
+/* Page container (centered content) */
+.page-container {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 30px;
+}
+
+/* Auth card (login/register) */
+.auth-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 40px 36px;
+    box-shadow: 0 30px 80px -30px rgba(0,0,0,0.6);
+}
+
+/* Top bar (for lobby, result pages) */
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+}
+
+.topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+/* Footer text */
+.footer-text {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 11px;
+    color: var(--muted-2);
+}
+
+/* Link */
+.link {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 13px;
+    cursor: pointer;
+}
+.link:hover { text-decoration: underline; }
+
+/* Responsive */
+@media (max-width: 600px) {
+    .auth-card { padding: 30px 24px; }
+}

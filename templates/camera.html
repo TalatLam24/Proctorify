@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Workspace Camera</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: sans-serif; text-align: center; background-color: #222; color: white; padding-top: 20px;}
+        video { transform: scaleX(-1); border: 4px solid #555; border-radius: 10px; max-width: 90%; }
+        #status { font-size: 1.5em; margin: 20px; font-weight: bold; }
+        .recording { background-color: #d32f2f; color: white; padding: 10px; border-radius: 5px; }
+        .finished { background-color: #388e3c; color: white; padding: 10px; border-radius: 5px; }
+        .uploading { background-color: #f57c00; color: white; padding: 10px; border-radius: 5px; }
+        #failsafeBtn { display: none; margin-top: 20px; padding: 15px 30px; font-size: 1.2em; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        #debugLog { margin-top: 20px; font-family: monospace; color: #ffeb3b; font-size: 0.9em; text-align: left; padding: 0 10px; max-height: 150px; overflow-y: auto;}
+    </style>
+</head>
+<body>
+    <h2>Workspace Camera</h2>
+    <video id="video" width="640" height="480" autoplay playsinline muted></video>
+    <div id="status">Waiting for Desktop to start exam...</div>
+    
+    <button id="failsafeBtn" onclick="stopAndUpload()">Force Upload Backup</button>
+    <div id="debugLog">--- System Log ---<br></div>
+
+    <script>
+        const video = document.getElementById('video');
+        const statusEl = document.getElementById('status');
+        const failsafeBtn = document.getElementById('failsafeBtn');
+        const debugLog = document.getElementById('debugLog');
+        
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isRecordingLocally = false;
+        let isTransitioning = false;
+        let stream;
+        let wakeLock = null;
+        let fileExtension = 'webm'; // Default to webm for Android
+
+        function logDebug(msg) {
+            console.log(msg);
+            debugLog.innerHTML += msg + "<br>";
+            debugLog.scrollTop = debugLog.scrollHeight;
+        }
+
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    logDebug("WakeLock active: Screen will stay on.");
+                }
+            } catch (err) {
+                logDebug("WakeLock failed: " + err.message);
+            }
+        }
+
+        async function setupCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }, 
+                    audio: false 
+                });
+                video.srcObject = stream;
+                logDebug("Camera access granted.");
+            } catch (err) {
+                statusEl.textContent = "Camera access denied or failed.";
+                logDebug("Camera Error: " + err.message);
+            }
+        }
+
+        async function startRecording() {
+            if (!stream) return;
+            
+            try {
+                await requestWakeLock();
+
+                let options = {};
+                // Determine Native Format
+                if (MediaRecorder.isTypeSupported('video/mp4')) {
+                    options = { mimeType: 'video/mp4' };
+                    fileExtension = 'mp4';
+                    logDebug("Using native format: MP4");
+                } else if (MediaRecorder.isTypeSupported('video/webm; codecs=vp8')) {
+                    options = { mimeType: 'video/webm; codecs=vp8' };
+                    fileExtension = 'webm';
+                    logDebug("Using native format: WebM/VP8");
+                } else {
+                    logDebug("Using browser default format.");
+                }
+
+                mediaRecorder = new MediaRecorder(stream, options);
+                
+                mediaRecorder.ondataavailable = function(e) {
+                    if (e.data.size > 0) {
+                        recordedChunks.push(e.data);
+                        logDebug("Chunk saved. Total chunks: " + recordedChunks.length);
+                    }
+                };
+                
+                mediaRecorder.start(1000); 
+                isRecordingLocally = true;
+                statusEl.textContent = "🔴 RECORDING IN PROGRESS";
+                statusEl.className = 'recording';
+                failsafeBtn.style.display = "inline-block";
+                logDebug("Recording started successfully.");
+            } catch (err) {
+                statusEl.textContent = "❌ Failed to start: " + err.message;
+                logDebug("Start Rec Error: " + err.message);
+            }
+        }
+
+        async function stopAndUpload() {
+            if (!isRecordingLocally) return;
+            isRecordingLocally = false;
+            failsafeBtn.style.display = "none";
+            
+            statusEl.textContent = "Uploading secure video... Please wait.";
+            statusEl.className = 'uploading';
+            
+            await new Promise(r => setTimeout(r, 100)); 
+            
+            try {
+                mediaRecorder.stop();
+                if (wakeLock !== null) {
+                    await wakeLock.release();
+                    wakeLock = null;
+                }
+            } catch (err) {
+                statusEl.textContent = "❌ Hardware Error: " + err.message;
+                logDebug("Stop Rec Error: " + err.message);
+                return;
+            }
+            
+            mediaRecorder.onstop = async () => {
+                const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+                logDebug("Recording stopped. Blob size: " + blob.size + " bytes.");
+                const formData = new FormData();
+                
+                // Send the exact extension to the server
+                const filename = 'phone_video.' + fileExtension;
+                formData.append('video', blob, filename); 
+                
+                try {
+                    logDebug("Sending to server as " + filename);
+                    const response = await fetch('/upload_video', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (response.ok) {
+                        statusEl.innerHTML = "✅ Upload Complete.<br>You may close this tab.";
+                        statusEl.className = 'finished';
+                        logDebug("Upload Success!");
+                    } else {
+                        throw new Error("Server rejected the file.");
+                    }
+                } catch (err) {
+                    statusEl.innerHTML = "❌ Network Error! <br><br> Saving backup to your phone...";
+                    statusEl.style.backgroundColor = "red";
+                    logDebug("Upload Error: " + err.message);
+                    
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'phone_video_BACKUP.' + fileExtension;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                }
+                
+                stream.getTracks().forEach(track => track.stop());
+                recordedChunks = [];
+                mediaRecorder = null;
+            };
+        }
+
+        setInterval(async () => {
+            if (isTransitioning) return; 
+            try {
+                const cb = new Date().getTime();
+                const res = await fetch('/status?t=' + cb, { headers: { 'ngrok-skip-browser-warning': 'true' } });
+                const data = await res.json();
+                
+                if (data.is_recording === true && !isRecordingLocally) {
+                    isTransitioning = true;
+                    await startRecording();
+                    isTransitioning = false;
+                } else if (data.is_recording === false && isRecordingLocally) {
+                    isTransitioning = true;
+                    await stopAndUpload();
+                    isTransitioning = false;
+                }
+            } catch (e) {
+                // Silent catch
+            }
+        }, 500);
+
+        setupCamera();
+    </script>
+</body>
+</html>

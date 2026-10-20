@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Workspace Camera</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: sans-serif; text-align: center; background-color: #222; color: white; padding-top: 20px;}
+        video { transform: scaleX(-1); border: 4px solid #555; border-radius: 10px; max-width: 90%; }
+        #status { font-size: 1.5em; margin: 20px; font-weight: bold; }
+        .recording { background-color: #d32f2f; color: white; padding: 10px; border-radius: 5px; }
+        .finished { background-color: #388e3c; color: white; padding: 10px; border-radius: 5px; }
+        .uploading { background-color: #f57c00; color: white; padding: 10px; border-radius: 5px; }
+        /* The Failsafe Button */
+        #failsafeBtn { display: none; margin-top: 20px; padding: 15px 30px; font-size: 1.2em; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h2>Workspace Camera</h2>
+    <video id="video" width="640" height="480" autoplay playsinline muted></video>
+    <div id="status">Waiting for Desktop to start exam...</div>
+    
+    <button id="failsafeBtn" onclick="stopAndUpload()">Force Upload Backup</button>
+
+    <script>
+        const video = document.getElementById('video');
+        const statusEl = document.getElementById('status');
+        const failsafeBtn = document.getElementById('failsafeBtn');
+        
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isRecordingLocally = false;
+        let isTransitioning = false; // Lock to prevent race conditions
+        let stream;
+
+        async function setupCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment', frameRate: { ideal: 30, max: 30 } }, 
+                    audio: false 
+                });
+                video.srcObject = stream;
+            } catch (err) {
+                statusEl.textContent = "Camera access denied or failed.";
+            }
+        }
+
+        async function startRecording() {
+            if (!stream) return;
+            
+            try {
+                // Omit MIME type completely. Let the browser pick its most stable native encoder.
+                mediaRecorder = new MediaRecorder(stream);
+                
+                mediaRecorder.ondataavailable = function(e) {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                };
+                
+                mediaRecorder.start();
+                isRecordingLocally = true;
+                statusEl.textContent = "🔴 RECORDING IN PROGRESS";
+                statusEl.className = 'recording';
+                failsafeBtn.style.display = "inline-block"; // Reveal the failsafe button
+            } catch (err) {
+                statusEl.textContent = "❌ Failed to start: " + err.message;
+            }
+        }
+
+        async function stopAndUpload() {
+            if (!isRecordingLocally) return;
+            isRecordingLocally = false;
+            failsafeBtn.style.display = "none";
+            
+            // 1. Force the UI to update visually
+            statusEl.textContent = "Uploading secure video... Please wait.";
+            statusEl.className = 'uploading';
+            
+            // 2. Pause for 100ms so the browser physically paints the text to the screen
+            // before running any risky hardware commands.
+            await new Promise(r => setTimeout(r, 100)); 
+            
+            try {
+                // 3. Now attempt the hardware stop
+                mediaRecorder.stop();
+            } catch (err) {
+                statusEl.textContent = "❌ Hardware Error: " + err.message;
+                return;
+            }
+            
+            mediaRecorder.onstop = async () => {
+                // Construct the blob using the format the phone natively chose
+                const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/mp4' });
+                const formData = new FormData();
+                formData.append('video', blob, 'phone_video.mp4'); 
+                
+                try {
+                    const response = await fetch('/upload_video', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (response.ok) {
+                        statusEl.innerHTML = "✅ Upload Complete.<br>You may close this tab.";
+                        statusEl.className = 'finished';
+                    } else {
+                        throw new Error("Server rejected the file.");
+                    }
+                } catch (err) {
+                    // Fail over to local download if network completely drops
+                    statusEl.innerHTML = "❌ Network Error! <br><br> Saving backup to your phone...";
+                    statusEl.style.backgroundColor = "red";
+                    
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'phone_video_BACKUP.mp4';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                }
+                
+                stream.getTracks().forEach(track => track.stop());
+                recordedChunks = [];
+                mediaRecorder = null;
+            };
+        }
+
+        // The Polling Loop
+        setInterval(async () => {
+            if (isTransitioning) return; // Wait if we are currently starting/stopping
+            
+            try {
+                const cb = new Date().getTime();
+                const res = await fetch('/status?t=' + cb, { 
+                    headers: { 'ngrok-skip-browser-warning': 'true' } 
+                });
+                const data = await res.json();
+                
+                if (data.is_recording === true && !isRecordingLocally) {
+                    isTransitioning = true;
+                    await startRecording();
+                    isTransitioning = false;
+                } else if (data.is_recording === false && isRecordingLocally) {
+                    isTransitioning = true;
+                    await stopAndUpload();
+                    isTransitioning = false;
+                }
+            } catch (e) {
+                console.log("Waiting for server...");
+            }
+        }, 200);
+
+        setupCamera();
+    </script>
+</body>
+</html>

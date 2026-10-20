@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proctorify | Exam Lobby</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/styles.css">
+<style>
+    .lobby-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 32px 24px;
+    }
+
+    .welcome-section {
+        margin-bottom: 32px;
+    }
+    .welcome-section h1 {
+        font-size: 28px;
+        font-weight: 800;
+        margin-bottom: 6px;
+    }
+    .welcome-section p {
+        color: var(--muted);
+        font-size: 14px;
+    }
+
+    .section-label {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        color: var(--muted-2);
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .section-label::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--line);
+    }
+
+    .exam-card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 24px;
+        margin-bottom: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 20px;
+        transition: border-color .15s ease;
+    }
+    .exam-card:hover {
+        border-color: var(--accent);
+    }
+
+    .exam-info {
+        flex: 1;
+    }
+    .exam-title {
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+    .exam-description {
+        color: var(--muted);
+        font-size: 13px;
+        margin-bottom: 12px;
+        line-height: 1.5;
+    }
+    .exam-meta {
+        display: flex;
+        gap: 16px;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--muted-2);
+    }
+    .exam-meta-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .loading-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--muted);
+    }
+    .loading-state svg {
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--muted);
+    }
+
+    .user-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+    }
+    .user-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+    }
+    .logout-link {
+        color: var(--muted);
+        font-size: 12px;
+        cursor: pointer;
+        margin-left: 8px;
+    }
+    .logout-link:hover {
+        color: var(--danger);
+    }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+    <div class="topbar-brand">
+        <div class="brand-mark"></div>
+        <div class="brand-name">Proctor<span>ify</span></div>
+    </div>
+    <div class="topbar-right">
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" title="Toggle theme">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        </button>
+        <div class="user-info">
+            <div class="user-avatar" id="userAvatar">?</div>
+            <span id="userName">Loading...</span>
+            <span class="logout-link" id="logoutLink">Logout</span>
+        </div>
+    </div>
+</div>
+
+<div class="lobby-container">
+    <div class="welcome-section">
+        <h1>Available Exams</h1>
+        <p>Select an exam to begin. Your session will be monitored by Proctorify.</p>
+    </div>
+
+    <div class="section-label">Active Exams</div>
+
+    <div id="examList">
+        <div class="loading-state" id="loadingState">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 6v6l4 2"></path>
+            </svg>
+            <div>Loading exams...</div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/auth.js"></script>
+<script>
+    initTheme();
+    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+    // Require authentication
+    requireAuth().then(user => {
+        if (!user) return;
+        document.getElementById('userName').textContent = user.name;
+        document.getElementById('userAvatar').textContent = user.name.charAt(0).toUpperCase();
+        loadExams();
+    });
+
+    document.getElementById('logoutLink').addEventListener('click', logout);
+
+    async function loadExams() {
+        try {
+            const data = await apiCall('/api/exams');
+            const exams = data.exams;
+            const list = document.getElementById('examList');
+
+            if (exams.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity: 0.4; margin-bottom: 16px;">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        <div>No active exams available.</div>
+                        <div style="font-size: 12px; margin-top: 8px;">Please contact your instructor.</div>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = exams.map(exam => `
+                <div class="exam-card">
+                    <div class="exam-info">
+                        <div class="exam-title">${escapeHtml(exam.title)}</div>
+                        <div class="exam-description">${escapeHtml(exam.description || '')}</div>
+                        <div class="exam-meta">
+                            <span class="exam-meta-item">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                ${exam.duration_minutes} minutes
+                            </span>
+                            <span class="exam-meta-item">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                ${exam.question_count} questions
+                            </span>
+                        </div>
+                    </div>
+                    <button class="btn-primary" onclick="startExam(${exam.id})">Start Exam</button>
+                </div>
+            `).join('');
+        } catch (err) {
+            document.getElementById('examList').innerHTML = `
+                <div class="empty-state">
+                    <div style="color: var(--danger);">Failed to load exams: ${escapeHtml(err.message)}</div>
+                </div>
+            `;
+        }
+    }
+
+    async function startExam(examId) {
+        try {
+            const data = await apiCall('/api/session/start', {
+                method: 'POST',
+                body: JSON.stringify({ exam_id: examId })
+            });
+            // Store session info and redirect to exam page
+            sessionStorage.setItem('current_session_id', data.session_id);
+            sessionStorage.setItem('current_exam', JSON.stringify(data.exam));
+            window.location.href = '/exam';
+        } catch (err) {
+            alert('Failed to start exam: ' + err.message);
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+</script>
+
+</body>
+</html>

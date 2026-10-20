@@ -1,0 +1,176 @@
+# Proctorify Approach 03: Four-Model Hold-Out Evaluation
+# Phase: Model retraining with stronger evaluation methodology
+#
+# Trains 4 models (XGBoost, RF, Logistic Regression, SVM) on 4 training subjects
+# and evaluates on 2 held-out test subjects (Lam + 6th subject).
+#
+# Key methodology decisions:
+# - Test set: 40,000 frames per test subject (Option B - physically balanced)
+# - Ensemble: Performance-weighted by individual F2 (Option C)
+# - Hyperparameters: Defaults for XGBoost/RF/LR, grid search for SVM
+# - Evaluation: Per-subject F2 reporting + overall F2
+
+# Data paths
+data:
+  grand_csv: ./grand_dataset.csv
+  results_dir: ./results
+  models_dir: ./saved_models
+
+# Subject split
+# training: 4 of the 5 original subjects (all except Lam)
+# testing: Lam (held out) + the new 6th subject
+subjects:
+  training:
+    - Bushra
+    - Prova
+    - Shahin
+    - Zarif
+  testing:
+    - Lam
+    - Ikra
+
+# Test set capping (Option B)
+# Each test subject's data is capped at this many frames
+test_cap_frames_per_subject: 40000
+
+# Feature columns (53 total: 24 visual + 29 keyboard)
+feature_columns:
+  # --- Visual: Spatial (8) ---
+  - Pitch
+  - Yaw
+  - Qx
+  - Qy
+  - Qz
+  - Qw
+  - Gaze_X
+  - Gaze_Y
+  # --- Visual: Velocity (8) ---
+  - Pitch_Vel
+  - Yaw_Vel
+  - Qx_Vel
+  - Qy_Vel
+  - Qz_Vel
+  - Qw_Vel
+  - Gaze_X_Vel
+  - Gaze_Y_Vel
+  # --- Visual: Variance (8) ---
+  - Pitch_Var
+  - Yaw_Var
+  - Qx_Var
+  - Qy_Var
+  - Qz_Var
+  - Qw_Var
+  - Gaze_X_Var
+  - Gaze_Y_Var
+  # --- Keyboard: DD-Time Statistics (5) ---
+  - DD_Time_Mean_2s
+  - DD_Time_Mean_10s
+  - DD_Time_Std_10s
+  - DD_Time_Min_10s
+  - DD_Time_Max_10s
+  # --- Keyboard: N-Graph DD-Times (2) ---
+  - DiGraph_DD_Mean_10s
+  - TriGraph_DD_Mean_10s
+  # --- Keyboard: L/R/S Region DD-Times (8) ---
+  - DD_Time_LL_30s
+  - DD_Time_LR_30s
+  - DD_Time_LS_30s
+  - DD_Time_RL_30s
+  - DD_Time_RR_30s
+  - DD_Time_RS_30s
+  - DD_Time_SL_30s
+  - DD_Time_SR_30s
+  # --- Keyboard: Special Key Ratios (4) ---
+  - Shift_Ratio_30s
+  - Backspace_Ratio_30s
+  - Enter_Ratio_30s
+  - Space_Ratio_30s
+  # --- Keyboard: Keystroke Volume (4) ---
+  - Key_Count_2s
+  - Key_Count_10s
+  - Key_Count_30s
+  - Key_Rate_60s
+  # --- Keyboard: Pause Patterns (3) ---
+  - Pause_Count_30s
+  - Longest_Pause_30s
+  - Pause_Time_Ratio_30s
+  # --- Keyboard: Burst Detection (2) ---
+  - Burst_Count_10s
+  - Burst_Key_Count_10s
+  # --- Keyboard: Mouse Activity (1) ---
+  - Mouse_Click_Count_30s
+
+# Label configuration
+label:
+  column: Target_Label
+  positive_class: CHEAT_PHYSICAL
+  negative_class: NORMAL
+
+# XGBoost configuration (GPU, default hyperparameters - no tuning)
+xgboost:
+  n_estimators: 200
+  max_depth: 6
+  learning_rate: 0.1
+  subsample: 0.8
+  colsample_bytree: 0.8
+  min_child_weight: 1
+  gamma: 0.0
+  reg_alpha: 0.0
+  reg_lambda: 1.0
+  tree_method: hist
+  device: cuda
+  verbosity: 0
+  n_jobs: -1
+
+# Random Forest configuration (CPU, default hyperparameters - no tuning)
+random_forest:
+  n_estimators: 200
+  max_depth: null
+  min_samples_split: 5
+  min_samples_leaf: 2
+  max_features: sqrt
+  class_weight: balanced
+  n_jobs: -1
+
+# Logistic Regression configuration (CPU, default hyperparameters - no tuning)
+# Note: LR uses feature scaling (StandardScaler) internally
+logistic_regression:
+  C: 1.0
+  penalty: l2
+  max_iter: 1000
+  class_weight: balanced
+  solver: lbfgs
+
+# SVM configuration (CPU, with grid search)
+# Note: SVM uses feature scaling (StandardScaler) internally
+# Note: SVM is sub-sampled to 50,000 training examples for tractability
+# (SVM with RBF kernel scales as O(n^2) to O(n^3), intractable on 270K samples)
+svm:
+  kernel: rbf
+  probability: true
+  class_weight: balanced
+  max_samples: 50000    # Subsample training to this many examples
+  grid_search:
+    C: [0.1, 1, 10, 100]
+    gamma: [0.001, 0.01, 0.1, 1]
+
+# Post-processing
+post_processing:
+  ema_alpha: 0.3
+  persistence_gate_seconds: 0.0  # Disabled (Option B - empirical tuning later)
+
+# Threshold optimization
+threshold:
+  sweep_min: 0.01
+  sweep_max: 0.90
+  sweep_step: 0.01
+  metric: f2
+  beta: 2.0
+
+# Ensemble configuration (Option C: performance-weighted)
+ensemble:
+  method: performance_weighted
+  # Each model's weight = its individual F2 / sum of all individual F2s
+
+# Reproducibility
+random_state: 42

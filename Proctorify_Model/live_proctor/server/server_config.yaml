@@ -1,0 +1,58 @@
+# Proctorify Live Proctor Server Configuration
+# ==============================================
+
+# Server settings
+server:
+  host: "127.0.0.1"
+  port: 8000
+  # The frontend folder (relative to this file's location)
+  frontend_dir: "../frontend"
+
+# Database settings
+database:
+  # Path to the SQLite database (relative to this file's location)
+  path: "../data/proctorify.db"
+
+# Model settings
+model:
+  # Path to the trained XGBoost model (relative to this file's location)
+  # This points to the model trained in Approach 03
+  path: "../../approaches/03_four_model_holdout/saved_models/xgboost.joblib"
+  # Decision threshold (best threshold from Approach 03 evaluation)
+  threshold: 0.35
+  # EMA smoothing factor
+  ema_alpha: 0.15
+
+# Feature extraction settings
+features:
+  # Path to the MediaPipe face landmarker model (relative to project root)
+  face_model_path: "../../../face_landmarker.task"
+  # Variance window in seconds (must match training: 2.0)
+  variance_window_sec: 2.0
+  # Maximum keyboard event buffer age in seconds (for cleanup)
+  max_event_buffer_age_sec: 120
+
+# Streaming settings
+streaming:
+  # Target frame rate for the browser to send frames (fps)
+  frame_rate: 15
+  # JPEG quality for frame encoding (0-100)
+  jpeg_quality: 80
+
+# Debug settings
+debug:
+  # Save webcam frames to disk when an alert is active (Option B)
+  save_alert_frames: true
+  # Folder to save debug frames (relative to this file's location)
+  debug_frames_dir: "../data/debug_frames"
+
+# YOLO Object Detection settings
+yolo:
+  # Path to the YOLOv8n model (relative to this file's location)
+  model_path: "../../../yolov8n.pt"
+  # Confidence threshold for phone detection (0.0 to 1.0)
+  confidence_threshold: 0.5
+  # The class name to detect (standard COCO uses 'cell phone')
+  target_class: "cell phone"
+  # Boost probability when phone is detected
+  boost_probability: 0.80
